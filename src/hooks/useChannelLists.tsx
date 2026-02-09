@@ -1,10 +1,6 @@
 import { useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
-
-export type Channel = {
-  id: string;
-  [key: string]: any;
-};
+import { toast } from 'sonner';
+import type { Channel } from '@/types/youtube';
 
 type Lists = {
   [key: string]: Channel[];
@@ -33,23 +29,20 @@ const useChannelLists = () => {
     };
 
     window.addEventListener('storage', handleStorageChange);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const createList = (listName: string): void => {
     if (!listName || listName.length < 3) {
-      toast.error('List name must be at least 3 characters long.');
+      toast.error('Nazwa listy musi mieć co najmniej 3 znaki.');
       return;
     }
     setLists((prevLists) => {
       if (prevLists[listName]) {
-        toast.error(`List "${listName}" already exists.`);
+        toast.error(`Lista "${listName}" już istnieje.`);
         return prevLists;
       }
-      toast.success(`List "${listName}" created successfully!`);
+      toast.success(`Lista "${listName}" została utworzona!`);
       return { ...prevLists, [listName]: [] };
     });
   };
@@ -58,7 +51,7 @@ const useChannelLists = () => {
     setLists((prevLists) => {
       const updatedLists = { ...prevLists };
       delete updatedLists[listName];
-      toast.success(`List "${listName}" deleted successfully.`);
+      toast.success(`Lista "${listName}" została usunięta.`);
       return updatedLists;
     });
   };
@@ -79,11 +72,6 @@ const useChannelLists = () => {
     return lists[listName]?.length || 0;
   };
 
-  const refreshLists = (): void => {
-    const updatedLists = localStorage.getItem('lists');
-    setLists(updatedLists ? JSON.parse(updatedLists) : {});
-  };
-
   return {
     lists,
     createList,
@@ -91,7 +79,6 @@ const useChannelLists = () => {
     toggleChannelInList,
     getListCount,
     getChannelCountInList,
-    refreshLists,
   };
 };
 

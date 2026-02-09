@@ -1,149 +1,173 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import type { Subscription } from '@/types/youtube';
 
-const SUBSCRIPTIONS_API = `https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50`;
-const CHANNEL_DETAILS_API = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=`;
+const SUBSCRIPTIONS_API =
+  'https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50';
+const CHANNELS_API =
+  'https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=';
 
-interface Subscription {
-  id: string;
-  snippet: {
-    title: string;
-    thumbnails: {
-      default: {
-        url: string;
-      };
-      high: {
-        url: string;
-      };
-    };
-    resourceId: {
-      channelId: string;
-    };
-    publishedAt: string;
-  };
-  statistics?: {
-    subscriberCount: string;
-    videoCount: string;
-  };
+const CACHE_KEY = 'yt_subscriptions_cache';
+const CACHE_TTL = 15 * 60 * 1000; // 15 minut
+
+function chunkArray<T>(array: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
 }
 
-interface UseSubscriptionsResult {
+interface CachedData {
+  data: Subscription[];
+  timestamp: number;
+}
+
+function getCachedSubscriptions(): Subscription[] | null {
+  const cached = sessionStorage.getItem(CACHE_KEY);
+  if (!cached) return null;
+  try {
+    const { data, timestamp }: CachedData = JSON.parse(cached);
+    if (Date.now() - timestamp < CACHE_TTL) {
+      return data;
+    }
+  } catch {
+    // Nieprawidłowy cache
+  }
+  sessionStorage.removeItem(CACHE_KEY);
+  return null;
+}
+
+function setCachedSubscriptions(data: Subscription[]): void {
+  sessionStorage.setItem(
+    CACHE_KEY,
+    JSON.stringify({ data, timestamp: Date.now() })
+  );
+}
+
+export interface UseSubscriptionsResult {
   subscriptions: Subscription[];
+  isLoading: boolean;
+  error: string | null;
+  subscriptionCount: number;
   fetchSubscriptions: () => Promise<void>;
-  getSubscriptionsAsJson: () => string;
-  getSubscriptionCount: () => number | null;
 }
-
-let globalSubscriptionCount: number | null = null; // Global variable for subscription count
-let globalSubscriptions: Subscription[] | null = null; // Global variable for subscription list
 
 const useSubscriptions = (
   accessToken: string | null
 ): UseSubscriptionsResult => {
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>(() => {
+    return getCachedSubscriptions() || [];
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Function to fetch channel details
-  const fetchChannelDetails = useCallback(
-    async (channelId: string): Promise<Subscription | null> => {
-      if (!accessToken) return null;
+  // Batch: pobierz szczegóły kanałów po 50 na raz
+  const fetchChannelDetailsBatch = useCallback(
+    async (
+      channelIds: string[]
+    ): Promise<Map<string, { statistics: Subscription['statistics']; thumbnails?: Subscription['snippet']['thumbnails'] }>> => {
+      const results = new Map<
+        string,
+        { statistics: Subscription['statistics']; thumbnails?: Subscription['snippet']['thumbnails'] }
+      >();
+      if (!accessToken) return results;
 
-      try {
-        const response = await fetch(`${CHANNEL_DETAILS_API}${channelId}`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
+      const chunks = chunkArray(channelIds, 50);
+      for (const chunk of chunks) {
+        const ids = chunk.join(',');
+        const response = await fetch(`${CHANNELS_API}${ids}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
         });
-
-        if (!response.ok) {
-          throw new Error(`Error fetching channel details: ${response.status}`);
-        }
-
+        if (!response.ok) continue;
         const data = await response.json();
-        if (data.items && data.items.length > 0) {
-          const channelData = data.items[0];
-          return {
-            id: channelData.id,
-            snippet: channelData.snippet,
-            statistics: channelData.statistics,
-          };
+        for (const item of data.items || []) {
+          results.set(item.id, {
+            statistics: item.statistics,
+            thumbnails: item.snippet?.thumbnails,
+          });
         }
-      } catch (error) {
-        console.error('Failed to fetch channel details:', error);
       }
-      return null;
+      return results;
     },
     [accessToken]
   );
 
-  // Function to fetch subscriptions from API
   const fetchSubscriptions = useCallback(async () => {
     if (!accessToken) return;
 
+    // Sprawdź cache
+    const cached = getCachedSubscriptions();
+    if (cached && cached.length > 0) {
+      setSubscriptions(cached);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
     try {
-      const allSubscriptions: Subscription[] = [];
+      // Krok 1: Pobierz wszystkie subskrypcje (paginacja)
+      const allSubs: Subscription[] = [];
       let nextPageToken: string | null = null;
 
       do {
-        const response = await fetch(
-          `${SUBSCRIPTIONS_API}${nextPageToken ? `&pageToken=${nextPageToken}` : ''}`,
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          }
-        );
+        const url: string = nextPageToken
+          ? `${SUBSCRIPTIONS_API}&pageToken=${nextPageToken}`
+          : SUBSCRIPTIONS_API;
+
+        const response: Response = await fetch(url, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
 
         if (!response.ok) {
-          throw new Error(`Error: ${response.status} - ${response.statusText}`);
+          throw new Error(`Błąd API: ${response.status} ${response.statusText}`);
         }
 
-        const data = await response.json();
-        const subscriptionsWithDetails = await Promise.all(
-          (data.items || []).map(async (sub: Subscription) => {
-            const channelId = sub.snippet.resourceId.channelId;
-            const channelDetails = await fetchChannelDetails(channelId);
-            return {
-              ...sub,
-              statistics: channelDetails?.statistics,
-            };
-          })
-        );
-
-        allSubscriptions.push(...subscriptionsWithDetails);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data: any = await response.json();
+        allSubs.push(...(data.items || []));
         nextPageToken = data.nextPageToken || null;
       } while (nextPageToken);
 
-      setSubscriptions(allSubscriptions);
-      globalSubscriptions = allSubscriptions; // Update global subscription list
-      globalSubscriptionCount = allSubscriptions.length; // Update global subscription count
+      // Krok 2: Batch - pobierz statystyki kanałów
+      const channelIds = allSubs.map(
+        (sub) => sub.snippet.resourceId.channelId
+      );
+      const detailsMap = await fetchChannelDetailsBatch(channelIds);
+
+      // Krok 3: Połącz dane
+      const enrichedSubs = allSubs.map((sub) => {
+        const details = detailsMap.get(sub.snippet.resourceId.channelId);
+        return {
+          ...sub,
+          snippet: {
+            ...sub.snippet,
+            // Miniaturki z Channels API są bardziej aktualne niż z Subscriptions API
+            thumbnails: details?.thumbnails || sub.snippet.thumbnails,
+          },
+          statistics: details?.statistics,
+        };
+      });
+
+      setSubscriptions(enrichedSubs);
+      setCachedSubscriptions(enrichedSubs);
     } catch (err) {
-      console.error('Failed to fetch subscriptions:', err);
-      globalSubscriptions = null;
-      globalSubscriptionCount = null; // Set to null on error
+      const message =
+        err instanceof Error ? err.message : 'Nie udało się pobrać subskrypcji';
+      setError(message);
+      console.error('Błąd pobierania subskrypcji:', err);
+    } finally {
+      setIsLoading(false);
     }
-  }, [accessToken, fetchChannelDetails]);
-
-  // Fetch subscriptions on initial render or when accessToken changes
-  useEffect(() => {
-    fetchSubscriptions();
-  }, [fetchSubscriptions]);
-
-  // Function to return subscriptions as JSON
-  const getSubscriptionsAsJson = (): string => {
-    return JSON.stringify(subscriptions, null, 2);
-  };
-
-  // Function to return subscription count
-  const getSubscriptionCount = (): number | null => {
-    return globalSubscriptionCount;
-  };
+  }, [accessToken, fetchChannelDetailsBatch]);
 
   return {
     subscriptions,
+    isLoading,
+    error,
+    subscriptionCount: subscriptions.length,
     fetchSubscriptions,
-    getSubscriptionsAsJson,
-    getSubscriptionCount,
   };
 };
 
 export default useSubscriptions;
-export { globalSubscriptionCount, globalSubscriptions };
