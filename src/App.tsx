@@ -1,17 +1,28 @@
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import HomePage from './components/HomePage';
-import ListView from './components/ListView';
-import Subscriptions from './components/Subscriptions';
-import { AuthProvider } from './contexts/AuthContext';
+import LoginPage from '@/components/auth/LoginPage';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import DashboardLayout from '@/components/layout/DashboardLayout';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { SubscriptionsProvider } from '@/contexts/SubscriptionsContext';
+import { Toaster } from '@/components/ui/sonner';
 
 const App = () => {
   return (
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/subscriptions" element={<Subscriptions />} />
-          <Route path="/:listName" element={<ListView />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <SubscriptionsProvider>
+                  <DashboardLayout />
+                  <Toaster richColors position="bottom-right" />
+                </SubscriptionsProvider>
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </Router>
     </AuthProvider>
