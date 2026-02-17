@@ -29,7 +29,8 @@ const SubscriptionCard = ({
           e.preventDefault();
           window.open(
             `https://www.youtube.com/channel/${snippet.resourceId.channelId}`,
-            '_blank'
+            '_blank',
+            'noopener,noreferrer'
           );
         }
       }}
@@ -77,7 +78,8 @@ const SubscriptionCard = ({
             e.stopPropagation();
             window.open(
               `https://www.youtube.com/channel/${snippet.resourceId.channelId}`,
-              '_blank'
+              '_blank',
+              'noopener,noreferrer'
             );
           }}
         >
