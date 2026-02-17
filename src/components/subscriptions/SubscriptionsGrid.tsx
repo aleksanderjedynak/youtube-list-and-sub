@@ -96,7 +96,7 @@ const SubscriptionsGrid = ({ globalSearch }: SubscriptionsGridProps) => {
   const handleUnsubscribe = async (subscriptionId: string, channelName: string) => {
     setUnsubscribingChannel(channelName);
     try {
-      await fetch(
+      const response = await fetch(
         `https://www.googleapis.com/youtube/v3/subscriptions?id=${subscriptionId}`,
         {
           method: 'DELETE',
@@ -105,6 +105,9 @@ const SubscriptionsGrid = ({ globalSearch }: SubscriptionsGridProps) => {
           },
         }
       );
+      if (!response.ok) {
+        throw new Error(`Błąd API: ${response.status} ${response.statusText}`);
+      }
       // Wyczyść cache i odśwież
       sessionStorage.removeItem('yt_subscriptions_cache');
       await fetchSubscriptions();
