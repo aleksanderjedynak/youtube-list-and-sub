@@ -24,7 +24,7 @@ const LoginPage = () => {
     }
   }, [auth, navigate]);
 
-  if (!auth || auth.isLoading) {
+  if (!auth || auth.isLoading || (auth.accessToken && auth.userInfo)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
