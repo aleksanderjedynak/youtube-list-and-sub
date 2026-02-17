@@ -33,7 +33,7 @@ jobs:
 
       - name: Commitowanie niezacommitowanych zmian
         run: |
-          git add .
+          git add package.json package-lock.json
           git commit -m "(Bot GitHub Action): Ustawiam wersje na 0.0.0" || echo "Brak zmian do commitowania"
 
       - name: Podbijanie wersji
