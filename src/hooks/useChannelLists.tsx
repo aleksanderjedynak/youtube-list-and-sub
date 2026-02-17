@@ -9,7 +9,12 @@ type Lists = {
 const useChannelLists = () => {
   const [lists, setLists] = useState<Lists>(() => {
     const savedLists = localStorage.getItem('lists');
-    return savedLists ? JSON.parse(savedLists) : {};
+    if (!savedLists) return {};
+    try {
+      return JSON.parse(savedLists) as Lists;
+    } catch {
+      return {};
+    }
   });
 
   useEffect(() => {
@@ -24,7 +29,15 @@ const useChannelLists = () => {
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === 'lists') {
         const updatedLists = localStorage.getItem('lists');
-        setLists(updatedLists ? JSON.parse(updatedLists) : {});
+        if (!updatedLists) {
+          setLists({});
+          return;
+        }
+        try {
+          setLists(JSON.parse(updatedLists) as Lists);
+        } catch {
+          setLists({});
+        }
       }
     };
 
