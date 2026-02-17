@@ -8,7 +8,7 @@ import ChannelDetailDialog from './ChannelDetailDialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tv } from 'lucide-react';
+import { Tv, Loader2 } from 'lucide-react';
 
 interface SubscriptionsGridProps {
   globalSearch: string;
@@ -43,6 +43,7 @@ const SubscriptionsGrid = ({ globalSearch }: SubscriptionsGridProps) => {
   const [localSearch, setLocalSearch] = useState('');
   const [sortCriteria, setSortCriteria] = useState('default');
   const [selectedSub, setSelectedSub] = useState<Subscription | null>(null);
+  const [unsubscribingChannel, setUnsubscribingChannel] = useState<string | null>(null);
 
   // Połącz wyszukiwanie globalne (z headera) i lokalne
   const searchQuery = globalSearch || localSearch;
@@ -92,7 +93,8 @@ const SubscriptionsGrid = ({ globalSearch }: SubscriptionsGridProps) => {
     await fetchSubscriptions();
   };
 
-  const handleUnsubscribe = async (subscriptionId: string) => {
+  const handleUnsubscribe = async (subscriptionId: string, channelName: string) => {
+    setUnsubscribingChannel(channelName);
     try {
       await fetch(
         `https://www.googleapis.com/youtube/v3/subscriptions?id=${subscriptionId}`,
@@ -108,6 +110,8 @@ const SubscriptionsGrid = ({ globalSearch }: SubscriptionsGridProps) => {
       await fetchSubscriptions();
     } catch (error) {
       console.error('Nie udało się odsubskrybować:', error);
+    } finally {
+      setUnsubscribingChannel(null);
     }
   };
 
@@ -143,19 +147,33 @@ const SubscriptionsGrid = ({ globalSearch }: SubscriptionsGridProps) => {
       />
 
       {/* Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-        {isLoading && subscriptions.length === 0
-          ? Array.from({ length: 12 }).map((_, i) => (
-              <SubscriptionCardSkeleton key={i} />
-            ))
-          : filteredSubscriptions.map((sub) => (
-              <SubscriptionCard
-                key={sub.id}
-                subscription={sub}
-                onShowDetails={setSelectedSub}
-                onUnsubscribe={handleUnsubscribe}
-              />
-            ))}
+      <div className="relative">
+        {unsubscribingChannel && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg">
+            <div className="flex flex-col items-center gap-3 p-6 bg-card border rounded-lg shadow-lg">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm font-medium">
+                Usuwanie subskrypcji <span className="text-primary">{unsubscribingChannel}</span>...
+              </p>
+              <p className="text-xs text-muted-foreground">Pobieranie zaktualizowanej listy</p>
+            </div>
+          </div>
+        )}
+        <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 ${unsubscribingChannel ? 'pointer-events-none opacity-50' : ''}`}>
+          {isLoading && subscriptions.length === 0
+            ? Array.from({ length: 12 }).map((_, i) => (
+                <SubscriptionCardSkeleton key={i} />
+              ))
+            : filteredSubscriptions.map((sub) => (
+                <SubscriptionCard
+                  key={sub.id}
+                  subscription={sub}
+                  onShowDetails={setSelectedSub}
+                  onUnsubscribe={handleUnsubscribe}
+                  disabled={!!unsubscribingChannel}
+                />
+              ))}
+        </div>
       </div>
 
       {!isLoading && filteredSubscriptions.length === 0 && (
