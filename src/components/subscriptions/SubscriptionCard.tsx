@@ -8,13 +8,15 @@ import { ExternalLink, Trash2 } from 'lucide-react';
 interface SubscriptionCardProps {
   subscription: Subscription;
   onShowDetails: (sub: Subscription) => void;
-  onUnsubscribe: (subscriptionId: string) => void;
+  onUnsubscribe: (subscriptionId: string, channelName: string) => void;
+  disabled?: boolean;
 }
 
 const SubscriptionCard = ({
   subscription,
   onShowDetails,
   onUnsubscribe,
+  disabled,
 }: SubscriptionCardProps) => {
   const { snippet, statistics } = subscription;
 
@@ -22,6 +24,15 @@ const SubscriptionCard = ({
     <Card
       className="group overflow-hidden transition-all hover:border-primary/50 cursor-pointer"
       onClick={() => onShowDetails(subscription)}
+      onAuxClick={(e) => {
+        if (e.button === 1) {
+          e.preventDefault();
+          window.open(
+            `https://www.youtube.com/channel/${snippet.resourceId.channelId}`,
+            '_blank'
+          );
+        }
+      }}
     >
       <div className="aspect-square overflow-hidden bg-muted">
         <img
@@ -77,9 +88,10 @@ const SubscriptionCard = ({
           variant="destructive"
           size="sm"
           className="text-xs"
+          disabled={disabled}
           onClick={(e) => {
             e.stopPropagation();
-            onUnsubscribe(subscription.id);
+            onUnsubscribe(subscription.id, snippet.title);
           }}
         >
           <Trash2 className="h-3 w-3" />
