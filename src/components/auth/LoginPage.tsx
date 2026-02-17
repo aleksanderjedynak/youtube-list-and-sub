@@ -36,8 +36,22 @@ const LoginPage = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-content bg-background">
-      <div className="w-full max-w-5xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+    <div className="min-h-screen flex items-center justify-content bg-background relative overflow-hidden">
+      {/* Animated gradient orbs */}
+      <div
+        className="absolute top-[-5%] left-[5%] w-[500px] h-[500px] rounded-full"
+        style={{ background: 'radial-gradient(circle, #dc2626, transparent 60%)', animation: 'orb-float-1 20s ease-in-out infinite', opacity: 0.35, filter: 'blur(80px)' }}
+      />
+      <div
+        className="absolute bottom-[-5%] right-[5%] w-[450px] h-[450px] rounded-full"
+        style={{ background: 'radial-gradient(circle, #7c3aed, transparent 60%)', animation: 'orb-float-2 25s ease-in-out infinite', opacity: 0.3, filter: 'blur(80px)' }}
+      />
+      <div
+        className="absolute top-[50%] left-[50%] w-[400px] h-[400px] rounded-full -translate-x-1/2 -translate-y-1/2"
+        style={{ background: 'radial-gradient(circle, #2563eb, transparent 60%)', animation: 'orb-float-3 22s ease-in-out infinite', opacity: 0.25, filter: 'blur(80px)' }}
+      />
+
+      <div className="relative z-10 w-full max-w-5xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
         {/* Lewa strona - branding */}
         <div className="hidden lg:flex flex-col gap-6">
           <div className="flex items-center gap-3">
